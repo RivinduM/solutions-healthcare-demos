@@ -27,6 +27,7 @@ import {
   CircularProgress,
   Alert,
   Chip,
+  TextField,
 } from "@mui/material";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
@@ -37,18 +38,30 @@ interface LaunchScreenProps {
   patientId: string;
   launchId: string;
   fhirServer: string;
+  fhirBaseUrl: string;
+  clientId: string;
+  redirectUri: string;
   isDiscovering: boolean;
   error?: string;
   onAuthorize: () => void;
+  onFhirBaseUrlChange: (url: string) => void;
+  onClientIdChange: (value: string) => void;
+  onRedirectUriChange: (value: string) => void;
 }
 
 export default function LaunchScreen({
   patientId,
   launchId,
   fhirServer,
+  fhirBaseUrl,
+  clientId,
+  redirectUri,
   isDiscovering,
   error,
   onAuthorize,
+  onFhirBaseUrlChange,
+  onClientIdChange,
+  onRedirectUriChange,
 }: LaunchScreenProps) {
   return (
     <Box
@@ -107,6 +120,35 @@ export default function LaunchScreen({
                 </Stack>
               </Stack>
             </>
+          )}
+
+          {!launchId && (
+            <Stack spacing={2} mb={2}>
+              <TextField
+                fullWidth
+                label="FHIR Base URL"
+                value={fhirBaseUrl}
+                onChange={(e) => onFhirBaseUrlChange(e.target.value)}
+                size="small"
+                inputProps={{ style: { fontFamily: "monospace", fontSize: 13 } }}
+              />
+              <TextField
+                fullWidth
+                label="Client ID"
+                value={clientId}
+                onChange={(e) => onClientIdChange(e.target.value)}
+                size="small"
+                inputProps={{ style: { fontFamily: "monospace", fontSize: 13 } }}
+              />
+              <TextField
+                fullWidth
+                label="Redirect URI"
+                value={redirectUri}
+                onChange={(e) => onRedirectUriChange(e.target.value)}
+                size="small"
+                inputProps={{ style: { fontFamily: "monospace", fontSize: 13 } }}
+              />
+            </Stack>
           )}
 
           <Button

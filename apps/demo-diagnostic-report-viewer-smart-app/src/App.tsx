@@ -49,6 +49,7 @@ declare global {
       scope: string;
       authorizationEndpoint: string;
       tokenEndpoint: string;
+      fhirBaseUrl: string;
     };
   }
 }
@@ -61,6 +62,8 @@ const SK_STATE = "smart_state";
 const SK_CODE_VERIFIER = "smart_code_verifier";
 const SK_TOKEN_ENDPOINT = "smart_token_endpoint";
 const SK_FLOW_LOG = "smart_flow_log";
+const SK_CLIENT_ID = "smart_client_id";
+const SK_REDIRECT_URI = "smart_redirect_uri";
 
 async function fetchDiagnosticReports(
   iss: string,
@@ -96,6 +99,9 @@ export default function App() {
   const [fhirServer, setFhirServer] = useState("");
   const [fetchError, setFetchError] = useState("");
   const [isDiscovering, setIsDiscovering] = useState(false);
+  const [fhirBaseUrl, setFhirBaseUrl] = useState(() => window.Config.fhirBaseUrl ?? "");
+  const [clientId, setClientId] = useState(() => window.Config.clientId ?? "");
+  const [redirectUri, setRedirectUri] = useState(() => window.Config.redirectUri ?? "");
   const [flowEntries, setFlowEntries] = useState<FlowEntry[]>(loadFlowLog);
   const initialized = useRef(false);
 
@@ -145,7 +151,7 @@ export default function App() {
     setFlowEntries([]);
 
     try {
-      const iss = sessionStorage.getItem(SK_ISS) ?? "";
+      const iss = sessionStorage.getItem(SK_ISS) || fhirBaseUrl || "";
       const storedLaunchId = sessionStorage.getItem(SK_LAUNCH_ID) ?? "";
 
       let authEndpoint = window.Config.authorizationEndpoint;
@@ -181,6 +187,8 @@ export default function App() {
       }
 
       sessionStorage.setItem(SK_TOKEN_ENDPOINT, tokenEndpoint);
+      sessionStorage.setItem(SK_CLIENT_ID, clientId);
+      sessionStorage.setItem(SK_REDIRECT_URI, redirectUri);
 
       const { codeVerifier, codeChallenge } = await generatePKCE();
       const state = generateState();
@@ -189,8 +197,8 @@ export default function App() {
 
       const params = new URLSearchParams({
         response_type: "code",
-        client_id: window.Config.clientId,
-        redirect_uri: window.Config.redirectUri,
+        client_id: clientId,
+        redirect_uri: redirectUri,
         scope: window.Config.scope,
         state,
         code_challenge: codeChallenge,
@@ -209,8 +217,8 @@ export default function App() {
           body: JSON.stringify(
             {
               response_type: "code",
-              client_id: window.Config.clientId,
-              redirect_uri: window.Config.redirectUri,
+              client_id: clientId,
+              redirect_uri: redirectUri,
               scope: window.Config.scope,
               code_challenge_method: "S256",
               ...(storedLaunchId ? { launch: storedLaunchId } : {}),
@@ -242,12 +250,15 @@ export default function App() {
         sessionStorage.getItem(SK_TOKEN_ENDPOINT) ?? window.Config.tokenEndpoint;
       const iss = sessionStorage.getItem(SK_ISS) ?? "";
 
+      const savedClientId = sessionStorage.getItem(SK_CLIENT_ID) ?? window.Config.clientId;
+      const savedRedirectUri = sessionStorage.getItem(SK_REDIRECT_URI) ?? window.Config.redirectUri;
+
       const tokenRes = await exchangeCodeForToken(
         tokenEndpoint,
         code,
         codeVerifier,
-        window.Config.clientId,
-        window.Config.redirectUri
+        savedClientId,
+        savedRedirectUri
       );
 
       const jwtPayload = parseJwtPayload(tokenRes.access_token);
@@ -262,8 +273,8 @@ export default function App() {
             {
               grant_type: "authorization_code",
               code: code.slice(0, 12) + "…",
-              redirect_uri: window.Config.redirectUri,
-              client_id: window.Config.clientId,
+              redirect_uri: savedRedirectUri,
+              client_id: savedClientId,
               code_verifier: "[PKCE verifier]",
             },
             null,
@@ -352,9 +363,15 @@ export default function App() {
           patientId={patientId}
           launchId={launchId}
           fhirServer={fhirServer}
+          fhirBaseUrl={fhirBaseUrl}
+          clientId={clientId}
+          redirectUri={redirectUri}
           isDiscovering={isDiscovering}
           error={fetchError}
           onAuthorize={handleAuthorize}
+          onFhirBaseUrlChange={setFhirBaseUrl}
+          onClientIdChange={setClientId}
+          onRedirectUriChange={setRedirectUri}
         />
       );
     }

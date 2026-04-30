@@ -124,7 +124,7 @@ Flow entries persist across the authorization redirect via `sessionStorage` and 
 ## Project Structure
 
 ```
-demo-smart-app/
+demo-diagnostic-report-viewer-smart-app/
 ├── public/
 │   ├── config.js            # Runtime configuration (edit per environment)
 │   └── index.html
