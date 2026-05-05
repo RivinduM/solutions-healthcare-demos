@@ -152,4 +152,4 @@ Register an OAuth2 application in WSO2 IS 7.x with:
 - **PKCE**: enabled, mandatory
 - **Redirect URI**: `http://localhost:3000`
 - **Allowed origins**: `http://localhost:3000`
-- **Scopes**: `launch`, `openid`, `patient/DiagnosticReport.read`
+- **Scopes**: `launch`, `openid`, `patient/DiagnosticReport.r`

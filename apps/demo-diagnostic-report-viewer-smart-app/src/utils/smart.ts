@@ -53,15 +53,18 @@ export async function exchangeCodeForToken(
   code: string,
   codeVerifier: string,
   clientId: string,
-  redirectUri: string
+  redirectUri: string,
+  clientSecret?: string
 ): Promise<TokenResponse> {
-  const body = new URLSearchParams({
+  const params: Record<string, string> = {
     grant_type: "authorization_code",
     code,
     redirect_uri: redirectUri,
     client_id: clientId,
     code_verifier: codeVerifier,
-  });
+  };
+  if (clientSecret) params.client_secret = clientSecret;
+  const body = new URLSearchParams(params);
   const res = await fetch(tokenEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },

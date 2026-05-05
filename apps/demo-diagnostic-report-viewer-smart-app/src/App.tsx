@@ -45,6 +45,7 @@ declare global {
   interface Window {
     Config: {
       clientId: string;
+      clientSecret?: string;
       redirectUri: string;
       scope: string;
       authorizationEndpoint: string;
@@ -70,8 +71,9 @@ async function fetchDiagnosticReports(
   patientId: string,
   accessToken: string
 ): Promise<{ reports: DiagnosticReport[]; bundle: unknown; url: string }> {
-  const issPath = new URL(iss).pathname;
-  const url = `${issPath}/DiagnosticReport?patient=${patientId}`;
+  const base = iss || window.Config.fhirBaseUrl;
+  const relativePath = new URL(base).pathname.replace(/\/$/, "");
+  const url = `${relativePath}/DiagnosticReport?patient=${patientId}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -195,11 +197,15 @@ export default function App() {
       sessionStorage.setItem(SK_CODE_VERIFIER, codeVerifier);
       sessionStorage.setItem(SK_STATE, state);
 
+      const scope = storedLaunchId
+        ? window.Config.scope
+        : window.Config.scope.replace(/\blaunch\s*/g, "").trim();
+
       const params = new URLSearchParams({
         response_type: "code",
         client_id: clientId,
         redirect_uri: redirectUri,
-        scope: window.Config.scope,
+        scope,
         state,
         code_challenge: codeChallenge,
         code_challenge_method: "S256",
@@ -219,7 +225,7 @@ export default function App() {
               response_type: "code",
               client_id: clientId,
               redirect_uri: redirectUri,
-              scope: window.Config.scope,
+              scope,
               code_challenge_method: "S256",
               ...(storedLaunchId ? { launch: storedLaunchId } : {}),
               ...(iss ? { aud: iss } : {}),
@@ -258,7 +264,8 @@ export default function App() {
         code,
         codeVerifier,
         savedClientId,
-        savedRedirectUri
+        savedRedirectUri,
+        window.Config.clientSecret
       );
 
       const jwtPayload = parseJwtPayload(tokenRes.access_token);
