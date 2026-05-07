@@ -34,6 +34,7 @@ export interface FlowEntry {
     isError?: boolean;
   };
   decodedPayload?: string;
+  decodedIdToken?: string;
 }
 
 interface DevConsoleProps {
@@ -266,7 +267,7 @@ export default function DevConsole({ entries }: DevConsoleProps) {
             <Box
               sx={{
                 flex: 1,
-                borderRight: selected?.decodedPayload ? `1px solid ${BORDER}` : "none",
+                borderRight: (selected?.decodedPayload || selected?.decodedIdToken) ? `1px solid ${BORDER}` : "none",
                 display: "flex",
                 flexDirection: "column",
                 minWidth: 0,
@@ -303,11 +304,12 @@ export default function DevConsole({ entries }: DevConsoleProps) {
               </Box>
             </Box>
 
-            {/* Decoded JWT Payload — only when present */}
-            {selected?.decodedPayload && (
+            {/* Decoded Tokens — only when present */}
+            {(selected?.decodedPayload || selected?.decodedIdToken) && (
               <Box
                 sx={{
                   flex: 1,
+                  borderLeft: `1px solid ${BORDER}`,
                   display: "flex",
                   flexDirection: "column",
                   minWidth: 0,
@@ -325,22 +327,50 @@ export default function DevConsole({ entries }: DevConsoleProps) {
                     flexShrink: 0,
                   }}
                 >
-                  Decoded JWT Payload
+                  Decoded Tokens
                 </Typography>
                 <Box sx={{ flex: 1, overflowY: "auto", p: 1.5, backgroundColor: CODE_BG }}>
-                  <pre
-                    style={{
-                      margin: 0,
-                      color: "#a5d6a7",
-                      fontSize: 11,
-                      fontFamily: "monospace",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-all",
-                      lineHeight: 1.65,
-                    }}
-                  >
-                    {selected.decodedPayload}
-                  </pre>
+                  {selected.decodedPayload && (
+                    <>
+                      <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 10, mb: 0.5 }}>
+                        // access_token
+                      </Typography>
+                      <pre
+                        style={{
+                          margin: 0,
+                          marginBottom: selected.decodedIdToken ? 16 : 0,
+                          color: "#a5d6a7",
+                          fontSize: 11,
+                          fontFamily: "monospace",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-all",
+                          lineHeight: 1.65,
+                        }}
+                      >
+                        {selected.decodedPayload}
+                      </pre>
+                    </>
+                  )}
+                  {selected.decodedIdToken && (
+                    <>
+                      <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 10, mb: 0.5 }}>
+                        // id_token
+                      </Typography>
+                      <pre
+                        style={{
+                          margin: 0,
+                          color: "#80cbc4",
+                          fontSize: 11,
+                          fontFamily: "monospace",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-all",
+                          lineHeight: 1.65,
+                        }}
+                      >
+                        {selected.decodedIdToken}
+                      </pre>
+                    </>
+                  )}
                 </Box>
               </Box>
             )}

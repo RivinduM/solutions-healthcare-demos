@@ -301,12 +301,16 @@ export default function App() {
               expires_in: tokenRes.expires_in,
               scope: tokenRes.scope,
               access_token: tokenRes.access_token,
+              ...(tokenRes.id_token ? { id_token: tokenRes.id_token } : {}),
             },
             null,
             2
           ),
         },
         decodedPayload: JSON.stringify(jwtPayload, null, 2),
+        ...(tokenRes.id_token
+          ? { decodedIdToken: JSON.stringify(parseJwtPayload(tokenRes.id_token), null, 2) }
+          : {}),
       });
       const patient = jwtPayload.patient as string;
       setPatientId(patient);
