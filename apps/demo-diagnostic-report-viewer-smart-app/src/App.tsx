@@ -71,9 +71,13 @@ async function fetchDiagnosticReports(
   patientId: string,
   accessToken: string
 ): Promise<{ reports: DiagnosticReport[]; bundle: unknown; url: string }> {
-  const base = iss || window.Config.fhirBaseUrl;
-  const relativePath = new URL(base).pathname.replace(/\/$/, "");
-  const url = `${relativePath}/DiagnosticReport?patient=${patientId}`;
+  const fhirBase = (iss || window.Config.fhirBaseUrl).replace(/\/$/, "");
+  // TODO: Remove this localhost proxy workaround once CORS is configured on the FHIR server.
+  const parsed = new URL(fhirBase);
+  const base = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
+    ? parsed.pathname
+    : fhirBase;
+  const url = `${base}/DiagnosticReport?patient=${patientId}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -242,6 +246,7 @@ export default function App() {
       const msg = e instanceof Error ? e.message : "Authorization failed.";
       setFetchError(msg);
       setIsDiscovering(false);
+      setPhase("launch");
     }
   };
 
@@ -271,7 +276,7 @@ export default function App() {
       const jwtPayload = parseJwtPayload(tokenRes.access_token);
 
       addEntry({
-        label: "Token Exchange",
+        label: "Token Request",
         timestamp: new Date().toISOString(),
         request: {
           method: "POST",
@@ -388,7 +393,15 @@ export default function App() {
         <AppBar position="static" color="primary" elevation={1}>
           <Toolbar>
             <LocalHospitalIcon sx={{ mr: 1.5 }} />
-            <Typography variant="h6" fontWeight={700} sx={{ flex: 1 }}>
+            <Typography
+              variant="h6"
+              fontWeight={700}
+              sx={{ flex: 1, cursor: "pointer" }}
+              onClick={() => {
+                sessionStorage.clear();
+                handleAuthorize();
+              }}
+            >
               Diagnostic Reports Viewer
             </Typography>
             {patientId && (

@@ -7,11 +7,11 @@ A SMART on FHIR application that demonstrates the EHR Launch flow. Once authoriz
 ## Features
 
 - **SMART on FHIR EHR Launch** — receives `launch` and `iss` parameters from the EHR
-- **PKCE Authorization Code Flow** — secure token exchange with SHA-256 code challenge
+- **PKCE Authorization Code Flow** — secure token request with SHA-256 code challenge
 - **SMART Discovery** — auto-discovers authorization and token endpoints via `/.well-known/smart-configuration`
 - **Patient resolution from JWT** — extracts the `patient` claim directly from the access token
 - **DiagnosticReport viewer** — displays reports with category, status, conclusion, and results
-- **Developer Console** — collapsible side panel showing SMART Discovery → Authorization Redirect → Token Exchange → FHIR fetch flows with full request/response and decoded JWT payload
+- **Developer Console** — collapsible side panel showing SMART Discovery → Authorization Redirect → Token Request → FHIR fetch flows with full request/response and decoded JWT payload
 
 ---
 
@@ -114,7 +114,7 @@ Click the **DEVELOPER CONSOLE** tab on the right edge of the screen to open the 
 |---|---|
 | SMART Discovery | GET `{iss}/.well-known/smart-configuration` |
 | Authorization Redirect | GET to the authorization endpoint with all PKCE and SMART params |
-| Token Exchange | POST to the token endpoint; response includes the full access token and decoded JWT payload |
+| Token Request | POST to the token endpoint; response includes the full access token and decoded JWT payload |
 | Fetch DiagnosticReports | GET `{fhirServer}/DiagnosticReport?patient={id}`; response shows the full FHIR Bundle |
 
 Flow entries persist across the authorization redirect via `sessionStorage` and are cleared at the start of each new authorization flow.
@@ -136,7 +136,7 @@ demo-diagnostic-report-viewer-smart-app/
 │   │   └── ReportCard.tsx   # DiagnosticReport display card
 │   ├── utils/
 │   │   ├── pkce.ts          # PKCE code verifier / challenge generation
-│   │   └── smart.ts         # SMART discovery, token exchange, JWT decode
+│   │   └── smart.ts         # SMART discovery, token request, JWT decode
 │   ├── types.ts             # FHIR and app type definitions
 │   └── App.tsx              # Main app with phase-based routing and flow logging
 └── vite.config.ts           # Vite config with FHIR proxy

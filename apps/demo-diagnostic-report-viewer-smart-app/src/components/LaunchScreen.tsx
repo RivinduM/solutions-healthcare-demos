@@ -165,7 +165,7 @@ export default function LaunchScreen({
             onClick={onAuthorize}
             disabled={isDiscovering}
           >
-            {isDiscovering ? "Discovering endpoints..." : "Authorize"}
+            {isDiscovering ? "Discovering endpoints..." : "Connect"}
           </Button>
 
           <Typography variant="caption" color="text.secondary" display="block" textAlign="center" mt={1.5}>

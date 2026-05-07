@@ -72,7 +72,7 @@ export async function exchangeCodeForToken(
   });
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Token exchange failed: ${err}`);
+    throw new Error(`Token request failed: ${err}`);
   }
   return res.json();
 }
