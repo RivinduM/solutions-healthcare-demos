@@ -50,10 +50,11 @@ export default function DevConsole({ entries }: DevConsoleProps) {
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
+  const lastEntry = entries[entries.length - 1] ?? null;
   const selected =
     selectedId != null
-      ? (entries.find((e) => e.id === selectedId) ?? entries.at(-1) ?? null)
-      : (entries.at(-1) ?? null);
+      ? (entries.find((e) => e.id === selectedId) ?? lastEntry)
+      : lastEntry;
 
   return (
     <Box
@@ -139,7 +140,7 @@ export default function DevConsole({ entries }: DevConsoleProps) {
               entries.map((entry) => {
                 const isSelected =
                   selectedId === entry.id ||
-                  (selectedId == null && entry.id === entries.at(-1)?.id);
+                  (selectedId == null && entry.id === entries[entries.length - 1]?.id);
                 return (
                   <Box
                     key={entry.id}
