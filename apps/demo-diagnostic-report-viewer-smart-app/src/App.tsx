@@ -73,10 +73,15 @@ async function fetchDiagnosticReports(
 ): Promise<{ reports: DiagnosticReport[]; bundle: unknown; url: string }> {
   const fhirBase = (iss || window.Config.fhirBaseUrl).replace(/\/$/, "");
   // TODO: Remove this localhost proxy workaround once CORS is configured on the FHIR server.
-  const parsed = new URL(fhirBase);
-  const base = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
-    ? parsed.pathname
-    : fhirBase;
+  let base = fhirBase;
+  try {
+    const parsed = new URL(fhirBase);
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+      base = parsed.pathname;
+    }
+  } catch {
+    // fhirBase is not a valid absolute URL — use as-is
+  }
   const url = `${base}/DiagnosticReport?patient=${patientId}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
