@@ -50,7 +50,6 @@ interface LaunchScreenProps {
 }
 
 export default function LaunchScreen({
-  patientId,
   launchId,
   fhirServer,
   fhirBaseUrl,
