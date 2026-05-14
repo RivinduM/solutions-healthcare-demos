@@ -84,7 +84,7 @@ async function fetchDiagnosticReports(
   }
   const url = `${base}/DiagnosticReport?patient=${patientId}`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { Authorization: `Bearer ${accessToken}`, "Access-Control-Allow-Origin": "*" },
   });
   if (!res.ok) throw new Error("Failed to fetch diagnostic reports");
   const bundle = await res.json();
