@@ -51,6 +51,7 @@ declare global {
       authorizationEndpoint: string;
       tokenEndpoint: string;
       fhirBaseUrl: string;
+      diagnosticReportUrl?: string;
     };
   }
 }
@@ -71,20 +72,11 @@ async function fetchDiagnosticReports(
   patientId: string,
   accessToken: string
 ): Promise<{ reports: DiagnosticReport[]; bundle: unknown; url: string }> {
-  const fhirBase = (iss || window.Config.fhirBaseUrl).replace(/\/$/, "");
-  // TODO: Remove this localhost proxy workaround once CORS is configured on the FHIR server.
-  let base = fhirBase;
-  try {
-    const parsed = new URL(fhirBase);
-    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-      base = parsed.pathname;
-    }
-  } catch {
-    // fhirBase is not a valid absolute URL — use as-is
-  }
-  const url = `${base}/DiagnosticReport?patient=${patientId}`;
+  const base = (iss || window.Config.fhirBaseUrl).replace(/\/$/, "");
+  const reportPath = (window.Config.diagnosticReportUrl ?? "/DiagnosticReport").replace(/\/$/, "");
+  const url = `${base}${reportPath}?patient=${patientId}`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}`, "Access-Control-Allow-Origin": "*" },
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) throw new Error("Failed to fetch diagnostic reports");
   const bundle = await res.json();
@@ -407,7 +399,10 @@ export default function App() {
               fontWeight={700}
               sx={{ flex: 1, cursor: "pointer" }}
               onClick={() => {
+                // Preserve SK_ISS so handleAuthorize discovers from the correct SMART endpoint
+                const savedIss = sessionStorage.getItem(SK_ISS);
                 sessionStorage.clear();
+                if (savedIss) sessionStorage.setItem(SK_ISS, savedIss);
                 handleAuthorize();
               }}
             >
