@@ -45,16 +45,169 @@ const CODE_BG = "#1a2332";
 const PANEL_BG = "#546e7a";
 const TAB_BG = "#455a64";
 const BORDER = "#37474f";
+const HANDLE_BG = "#37474f";
+const HANDLE_HOVER = "#607d8b";
+
+function formatRequest(req: FlowEntry["request"]): string {
+  const lines: string[] = [`${req.method} ${req.url}`];
+  if (req.body) {
+    lines.push("");
+    try {
+      lines.push(JSON.stringify(JSON.parse(req.body), null, 2));
+    } catch {
+      lines.push(req.body);
+    }
+  }
+  return lines.join("\n");
+}
+
+function startHorizDrag(
+  e: React.MouseEvent,
+  currentWidth: number,
+  setter: React.Dispatch<React.SetStateAction<number>> | ((w: number) => void),
+  invert = false
+) {
+  e.preventDefault();
+  const startX = e.clientX;
+  const onMove = (ev: MouseEvent) => {
+    const delta = ev.clientX - startX;
+    const next = Math.max(80, invert ? currentWidth - delta : currentWidth + delta);
+    (setter as (w: number) => void)(next);
+  };
+  const onUp = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+  };
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+}
+
+function startVertDrag(
+  e: React.MouseEvent,
+  currentHeight: number,
+  setter: React.Dispatch<React.SetStateAction<number>>
+) {
+  e.preventDefault();
+  const startY = e.clientY;
+  const onMove = (ev: MouseEvent) => {
+    setter(Math.max(100, currentHeight + ev.clientY - startY));
+  };
+  const onUp = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+  };
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+}
+
+interface EntryDetailProps {
+  entry: FlowEntry;
+  col1Width: number;
+  col2Width: number;
+  detailHeight: number;
+  onCol1Resize: (e: React.MouseEvent) => void;
+  onCol2Resize: (e: React.MouseEvent) => void;
+  onVertResize: (e: React.MouseEvent) => void;
+}
+
+function EntryDetail({
+  entry,
+  col1Width,
+  col2Width,
+  detailHeight,
+  onCol1Resize,
+  onCol2Resize,
+  onVertResize,
+}: EntryDetailProps) {
+  const hasDecoded = Boolean(entry.decodedPayload || entry.decodedIdToken);
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", borderTop: `1px solid ${BORDER}` }}>
+      <Box sx={{ display: "flex", height: detailHeight }}>
+        {/* Column 1 — Request */}
+        <Box sx={{ width: col1Width, flexShrink: 0, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 10, px: 1.5, py: 0.5, borderBottom: `1px solid ${BORDER}`, backgroundColor: TAB_BG, flexShrink: 0 }}>
+            Request
+          </Typography>
+          <Box sx={{ flex: 1, overflowY: "auto", p: 1.5, backgroundColor: CODE_BG }}>
+            <pre style={{ margin: 0, color: "#cdd3de", fontSize: 10, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: 1.6 }}>
+              {formatRequest(entry.request)}
+            </pre>
+          </Box>
+        </Box>
+
+        {/* Horizontal resize handle 1 */}
+        <Box
+          onMouseDown={onCol1Resize}
+          sx={{ width: 4, flexShrink: 0, cursor: "col-resize", backgroundColor: HANDLE_BG, "&:hover": { backgroundColor: HANDLE_HOVER }, zIndex: 1 }}
+        />
+
+        {/* Column 2 — Response */}
+        <Box sx={{ width: col2Width, flexShrink: 0, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 10, px: 1.5, py: 0.5, borderBottom: `1px solid ${BORDER}`, backgroundColor: TAB_BG, flexShrink: 0 }}>
+            Response
+          </Typography>
+          <Box sx={{ flex: 1, overflowY: "auto", p: 1.5, backgroundColor: CODE_BG }}>
+            <pre style={{ margin: 0, color: entry.response?.isError ? "#ef9a9a" : "#cdd3de", fontSize: 10, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: 1.6 }}>
+              {entry.response?.body ?? "—"}
+            </pre>
+          </Box>
+        </Box>
+
+        {/* Horizontal resize handle 2 — only when decoded column exists */}
+        {hasDecoded && (
+          <Box
+            onMouseDown={onCol2Resize}
+            sx={{ width: 4, flexShrink: 0, cursor: "col-resize", backgroundColor: HANDLE_BG, "&:hover": { backgroundColor: HANDLE_HOVER }, zIndex: 1 }}
+          />
+        )}
+
+        {/* Column 3 — Decoded Tokens */}
+        {hasDecoded && (
+          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 10, px: 1.5, py: 0.5, borderBottom: `1px solid ${BORDER}`, backgroundColor: TAB_BG, flexShrink: 0 }}>
+              Decoded Tokens
+            </Typography>
+            <Box sx={{ flex: 1, overflowY: "auto", p: 1.5, backgroundColor: CODE_BG }}>
+              {entry.decodedPayload && (
+                <>
+                  <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 9, mb: 0.5 }}>// access_token</Typography>
+                  <pre style={{ margin: 0, marginBottom: entry.decodedIdToken ? 12 : 0, color: "#a5d6a7", fontSize: 10, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: 1.6 }}>
+                    {entry.decodedPayload}
+                  </pre>
+                </>
+              )}
+              {entry.decodedIdToken && (
+                <>
+                  <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 9, mb: 0.5 }}>// id_token</Typography>
+                  <pre style={{ margin: 0, color: "#80cbc4", fontSize: 10, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: 1.6 }}>
+                    {entry.decodedIdToken}
+                  </pre>
+                </>
+              )}
+            </Box>
+          </Box>
+        )}
+      </Box>
+
+      {/* Vertical resize handle */}
+      <Box
+        onMouseDown={onVertResize}
+        sx={{ height: 5, cursor: "row-resize", backgroundColor: HANDLE_BG, flexShrink: 0, "&:hover": { backgroundColor: HANDLE_HOVER } }}
+      />
+    </Box>
+  );
+}
 
 export default function DevConsole({ entries }: DevConsoleProps) {
   const [open, setOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [panelWidth, setPanelWidth] = useState(680);
+  const [col1Width, setCol1Width] = useState(210);
+  const [col2Width, setCol2Width] = useState(210);
+  const [detailHeight, setDetailHeight] = useState(280);
 
-  const lastEntry = entries[entries.length - 1] ?? null;
-  const selected =
-    selectedId != null
-      ? (entries.find((e) => e.id === selectedId) ?? lastEntry)
-      : lastEntry;
+  const toggle = (id: number) => setExpandedId((prev) => (prev === id ? null : id));
 
   return (
     <Box
@@ -67,20 +220,38 @@ export default function DevConsole({ entries }: DevConsoleProps) {
         flexDirection: "row",
         zIndex: 1300,
         pointerEvents: "none",
+        userSelect: "none",
       }}
     >
       {/* Expanded panel */}
       {open && (
         <Box
           sx={{
-            width: 640,
+            width: panelWidth,
+            minWidth: 320,
             backgroundColor: PANEL_BG,
             display: "flex",
             flexDirection: "column",
             pointerEvents: "all",
             boxShadow: "-4px 0 16px rgba(0,0,0,0.35)",
+            position: "relative",
           }}
         >
+          {/* Left-edge panel resize handle */}
+          <Box
+            onMouseDown={(e) => startHorizDrag(e, panelWidth, (w: number) => setPanelWidth(w), true)}
+            sx={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: 5,
+              height: "100%",
+              cursor: "col-resize",
+              backgroundColor: "transparent",
+              "&:hover": { backgroundColor: HANDLE_HOVER },
+              zIndex: 10,
+            }}
+          />
           {/* Header */}
           <Box
             sx={{
@@ -91,289 +262,94 @@ export default function DevConsole({ entries }: DevConsoleProps) {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              flexShrink: 0,
             }}
           >
-            <Typography
-              sx={{
-                color: "#eceff1",
-                fontFamily: "monospace",
-                fontSize: 13,
-                letterSpacing: 1.5,
-                fontWeight: 700,
-              }}
-            >
+            <Typography sx={{ color: "#eceff1", fontFamily: "monospace", fontSize: 13, letterSpacing: 1.5, fontWeight: 700 }}>
               Developer Console
             </Typography>
-            <Typography
-              sx={{
-                color: "#90a4ae",
-                fontFamily: "monospace",
-                fontSize: 11,
-              }}
-            >
+            <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 11 }}>
               {entries.length} flow{entries.length !== 1 ? "s" : ""}
             </Typography>
           </Box>
 
-          {/* Flow list */}
-          <Box
-            sx={{
-              maxHeight: "32%",
-              overflowY: "auto",
-              borderBottom: `2px solid ${BORDER}`,
-            }}
-          >
+          {/* Accordion list */}
+          <Box sx={{ flex: 1, overflowY: "auto" }}>
             {entries.length === 0 ? (
-              <Typography
-                sx={{
-                  color: "#90a4ae",
-                  textAlign: "center",
-                  mt: 3,
-                  mb: 3,
-                  fontSize: 12,
-                  fontFamily: "monospace",
-                }}
-              >
+              <Typography sx={{ color: "#90a4ae", textAlign: "center", mt: 3, mb: 3, fontSize: 12, fontFamily: "monospace" }}>
                 No flows captured yet.
               </Typography>
             ) : (
               entries.map((entry) => {
-                const isSelected =
-                  selectedId === entry.id ||
-                  (selectedId == null && entry.id === entries[entries.length - 1]?.id);
+                const isExpanded = expandedId === entry.id;
                 return (
-                  <Box
-                    key={entry.id}
-                    onClick={() => setSelectedId(entry.id)}
-                    sx={{
-                      px: 1.5,
-                      py: 0.7,
-                      cursor: "pointer",
-                      borderBottom: `1px solid ${BORDER}`,
-                      backgroundColor: isSelected ? "#37474f" : "transparent",
-                      "&:hover": { backgroundColor: "#3d5360" },
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                    }}
-                  >
-                    <Chip
-                      label={entry.request.method}
-                      size="small"
+                  <Box key={entry.id} sx={{ borderBottom: `1px solid ${BORDER}` }}>
+                    {/* Row header */}
+                    <Box
+                      onClick={() => toggle(entry.id)}
                       sx={{
-                        fontFamily: "monospace",
-                        fontSize: 9,
-                        height: 18,
-                        flexShrink: 0,
-                        backgroundColor:
-                          entry.request.method === "POST" ? "#bf360c" : "#1565c0",
-                        color: "white",
-                      }}
-                    />
-                    <Typography
-                      sx={{
-                        color: "#eceff1",
-                        fontSize: 12,
-                        fontFamily: "monospace",
-                        flex: 1,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        px: 1.5,
+                        py: 0.8,
+                        cursor: "pointer",
+                        backgroundColor: isExpanded ? "#37474f" : "transparent",
+                        "&:hover": { backgroundColor: "#3d5360" },
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
                       }}
                     >
-                      {entry.label}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        color: "#78909c",
-                        fontSize: 10,
-                        fontFamily: "monospace",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {new Date(entry.timestamp).toLocaleTimeString()}
-                    </Typography>
-                    {entry.response != null && (
+                      <Typography sx={{ color: "#78909c", fontFamily: "monospace", fontSize: 10, flexShrink: 0 }}>
+                        {isExpanded ? "▾" : "▸"}
+                      </Typography>
                       <Chip
-                        label={
-                          entry.response.status != null
-                            ? entry.response.status
-                            : entry.response.isError
-                            ? "ERR"
-                            : "OK"
-                        }
+                        label={entry.request.method}
                         size="small"
                         sx={{
                           fontFamily: "monospace",
                           fontSize: 9,
                           height: 18,
                           flexShrink: 0,
-                          backgroundColor: entry.response.isError
-                            ? "#b71c1c"
-                            : "#1b5e20",
+                          backgroundColor: entry.request.method === "POST" ? "#bf360c" : "#1565c0",
                           color: "white",
                         }}
+                      />
+                      <Typography sx={{ color: "#eceff1", fontSize: 12, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {entry.label}
+                      </Typography>
+                      <Typography sx={{ color: "#78909c", fontSize: 10, fontFamily: "monospace", flexShrink: 0 }}>
+                        {new Date(entry.timestamp).toLocaleTimeString()}
+                      </Typography>
+                      {entry.response != null && (
+                        <Chip
+                          label={entry.response.status != null ? entry.response.status : entry.response.isError ? "ERR" : "OK"}
+                          size="small"
+                          sx={{
+                            fontFamily: "monospace",
+                            fontSize: 9,
+                            height: 18,
+                            flexShrink: 0,
+                            backgroundColor: entry.response.isError ? "#b71c1c" : "#1b5e20",
+                            color: "white",
+                          }}
+                        />
+                      )}
+                    </Box>
+
+                    {/* Inline detail — expands under the heading */}
+                    {isExpanded && (
+                      <EntryDetail
+                        entry={entry}
+                        col1Width={col1Width}
+                        col2Width={col2Width}
+                        detailHeight={detailHeight}
+                        onCol1Resize={(e) => startHorizDrag(e, col1Width, setCol1Width)}
+                        onCol2Resize={(e) => startHorizDrag(e, col2Width, setCol2Width)}
+                        onVertResize={(e) => startVertDrag(e, detailHeight, setDetailHeight)}
                       />
                     )}
                   </Box>
                 );
               })
-            )}
-          </Box>
-
-          {/* Request / Response / Decoded panes */}
-          <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
-            {/* Request */}
-            <Box
-              sx={{
-                flex: 1,
-                borderRight: `1px solid ${BORDER}`,
-                display: "flex",
-                flexDirection: "column",
-                minWidth: 0,
-              }}
-            >
-              <Typography
-                sx={{
-                  color: "#90a4ae",
-                  fontFamily: "monospace",
-                  fontSize: 11,
-                  px: 1.5,
-                  py: 0.6,
-                  borderBottom: `1px solid ${BORDER}`,
-                  backgroundColor: TAB_BG,
-                  flexShrink: 0,
-                }}
-              >
-                Request Body
-              </Typography>
-              <Box sx={{ flex: 1, overflowY: "auto", p: 1.5, backgroundColor: CODE_BG }}>
-                <pre
-                  style={{
-                    margin: 0,
-                    color: "#cdd3de",
-                    fontSize: 11,
-                    fontFamily: "monospace",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-all",
-                    lineHeight: 1.65,
-                  }}
-                >
-                  {selected ? formatRequest(selected.request) : ""}
-                </pre>
-              </Box>
-            </Box>
-
-            {/* Response */}
-            <Box
-              sx={{
-                flex: 1,
-                borderRight: (selected?.decodedPayload || selected?.decodedIdToken) ? `1px solid ${BORDER}` : "none",
-                display: "flex",
-                flexDirection: "column",
-                minWidth: 0,
-              }}
-            >
-              <Typography
-                sx={{
-                  color: "#90a4ae",
-                  fontFamily: "monospace",
-                  fontSize: 11,
-                  px: 1.5,
-                  py: 0.6,
-                  borderBottom: `1px solid ${BORDER}`,
-                  backgroundColor: TAB_BG,
-                  flexShrink: 0,
-                }}
-              >
-                Response Body
-              </Typography>
-              <Box sx={{ flex: 1, overflowY: "auto", p: 1.5, backgroundColor: CODE_BG }}>
-                <pre
-                  style={{
-                    margin: 0,
-                    color: selected?.response?.isError ? "#ef9a9a" : "#cdd3de",
-                    fontSize: 11,
-                    fontFamily: "monospace",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-all",
-                    lineHeight: 1.65,
-                  }}
-                >
-                  {selected?.response?.body ?? "—"}
-                </pre>
-              </Box>
-            </Box>
-
-            {/* Decoded Tokens — only when present */}
-            {(selected?.decodedPayload || selected?.decodedIdToken) && (
-              <Box
-                sx={{
-                  flex: 1,
-                  borderLeft: `1px solid ${BORDER}`,
-                  display: "flex",
-                  flexDirection: "column",
-                  minWidth: 0,
-                }}
-              >
-                <Typography
-                  sx={{
-                    color: "#90a4ae",
-                    fontFamily: "monospace",
-                    fontSize: 11,
-                    px: 1.5,
-                    py: 0.6,
-                    borderBottom: `1px solid ${BORDER}`,
-                    backgroundColor: TAB_BG,
-                    flexShrink: 0,
-                  }}
-                >
-                  Decoded Tokens
-                </Typography>
-                <Box sx={{ flex: 1, overflowY: "auto", p: 1.5, backgroundColor: CODE_BG }}>
-                  {selected.decodedPayload && (
-                    <>
-                      <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 10, mb: 0.5 }}>
-                        // access_token
-                      </Typography>
-                      <pre
-                        style={{
-                          margin: 0,
-                          marginBottom: selected.decodedIdToken ? 16 : 0,
-                          color: "#a5d6a7",
-                          fontSize: 11,
-                          fontFamily: "monospace",
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-all",
-                          lineHeight: 1.65,
-                        }}
-                      >
-                        {selected.decodedPayload}
-                      </pre>
-                    </>
-                  )}
-                  {selected.decodedIdToken && (
-                    <>
-                      <Typography sx={{ color: "#90a4ae", fontFamily: "monospace", fontSize: 10, mb: 0.5 }}>
-                        // id_token
-                      </Typography>
-                      <pre
-                        style={{
-                          margin: 0,
-                          color: "#80cbc4",
-                          fontSize: 11,
-                          fontFamily: "monospace",
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-all",
-                          lineHeight: 1.65,
-                        }}
-                      >
-                        {selected.decodedIdToken}
-                      </pre>
-                    </>
-                  )}
-                </Box>
-              </Box>
             )}
           </Box>
         </Box>
@@ -413,17 +389,4 @@ export default function DevConsole({ entries }: DevConsoleProps) {
       </Box>
     </Box>
   );
-}
-
-function formatRequest(req: FlowEntry["request"]): string {
-  const lines: string[] = [`${req.method} ${req.url}`];
-  if (req.body) {
-    lines.push("");
-    try {
-      lines.push(JSON.stringify(JSON.parse(req.body), null, 2));
-    } catch {
-      lines.push(req.body);
-    }
-  }
-  return lines.join("\n");
 }

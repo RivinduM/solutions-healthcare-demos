@@ -38,6 +38,31 @@ export interface Attachment {
   url?: string;
 }
 
+export interface Quantity {
+  value?: number;
+  unit?: string;
+  system?: string;
+  code?: string;
+}
+
+export interface ObservationComponent {
+  code?: CodeableConcept;
+  valueQuantity?: Quantity;
+}
+
+export interface Observation {
+  resourceType: "Observation";
+  id?: string;
+  status?: string;
+  category?: Array<{ coding?: Coding[] }>;
+  code?: CodeableConcept;
+  subject?: Reference;
+  effectiveDateTime?: string;
+  effectivePeriod?: { start?: string; end?: string };
+  valueQuantity?: Quantity;
+  component?: ObservationComponent[];
+}
+
 export interface DiagnosticReport {
   resourceType: "DiagnosticReport";
   id?: string;

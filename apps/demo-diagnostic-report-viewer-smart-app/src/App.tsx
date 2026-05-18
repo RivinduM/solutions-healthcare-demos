@@ -32,8 +32,9 @@ import PersonIcon from "@mui/icons-material/Person";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import LaunchScreen from "./components/LaunchScreen";
 import ReportCard from "./components/ReportCard";
+import ObservationCard from "./components/ObservationCard";
 import DevConsole, { FlowEntry } from "./components/DevConsole";
-import { DiagnosticReport } from "./types";
+import { DiagnosticReport, Observation } from "./types";
 import { generatePKCE, generateState } from "./utils/pkce";
 import {
   discoverSmartConfiguration,
@@ -52,6 +53,7 @@ declare global {
       tokenEndpoint: string;
       fhirBaseUrl: string;
       diagnosticReportUrl?: string;
+      observationUrl?: string;
     };
   }
 }
@@ -65,25 +67,63 @@ const SK_CODE_VERIFIER = "smart_code_verifier";
 const SK_TOKEN_ENDPOINT = "smart_token_endpoint";
 const SK_FLOW_LOG = "smart_flow_log";
 const SK_CLIENT_ID = "smart_client_id";
+const SK_CLIENT_SECRET = "smart_client_secret";
 const SK_REDIRECT_URI = "smart_redirect_uri";
+
+interface FetchResult<T> {
+  data: T | null;
+  rawBody: string;
+  url: string;
+  status: number;
+  ok: boolean;
+}
 
 async function fetchDiagnosticReports(
   iss: string,
   patientId: string,
   accessToken: string
-): Promise<{ reports: DiagnosticReport[]; bundle: unknown; url: string }> {
+): Promise<FetchResult<{ reports: DiagnosticReport[]; bundle: unknown }>> {
   const base = (iss || window.Config.fhirBaseUrl).replace(/\/$/, "");
   const reportPath = (window.Config.diagnosticReportUrl ?? "/DiagnosticReport").replace(/\/$/, "");
-  const url = `${base}${reportPath}?patient=${patientId}`;
+  const url = `${base}${reportPath}?patient=Patient/${patientId}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error("Failed to fetch diagnostic reports");
-  const bundle = await res.json();
+  const rawBody = await res.text();
+  if (!res.ok) {
+    return { data: null, rawBody, url, status: res.status, ok: false };
+  }
+  const bundle = JSON.parse(rawBody);
   const reports = ((bundle.entry ?? []) as Array<{ resource?: DiagnosticReport }>)
     .map((e) => e.resource)
     .filter((r): r is DiagnosticReport => Boolean(r));
-  return { reports, bundle, url };
+  return { data: { reports, bundle }, rawBody, url, status: res.status, ok: true };
+}
+
+async function fetchObservations(
+  iss: string,
+  patientId: string,
+  accessToken: string
+): Promise<FetchResult<{ observations: Observation[]; bundle: unknown }>> {
+  const base = (iss || window.Config.fhirBaseUrl).replace(/\/$/, "");
+  const obsPath = (window.Config.observationUrl ?? "/Observation").replace(/\/$/, "");
+  const url = `${base}${obsPath}?patient=Patient/${patientId}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const rawBody = await res.text();
+  if (!res.ok) {
+    return { data: null, rawBody, url, status: res.status, ok: false };
+  }
+  const bundle = JSON.parse(rawBody);
+  const observations = ((bundle.entry ?? []) as Array<{ resource?: Observation }>)
+    .map((e) => e.resource)
+    .filter((r): r is Observation =>
+      Boolean(r) &&
+      (Boolean(r!.valueQuantity) || (r!.component ?? []).length > 0) &&
+      Boolean(r!.effectiveDateTime ?? r!.effectivePeriod?.start)
+    );
+  return { data: { observations, bundle }, rawBody, url, status: res.status, ok: true };
 }
 
 function loadFlowLog(): FlowEntry[] {
@@ -97,6 +137,9 @@ function loadFlowLog(): FlowEntry[] {
 export default function App() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [reports, setReports] = useState<DiagnosticReport[]>([]);
+  const [observations, setObservations] = useState<Observation[]>([]);
+  const [observationsAllowed, setObservationsAllowed] = useState(false);
+  const [diagnosticReportsAllowed, setDiagnosticReportsAllowed] = useState(false);
   const [patientId, setPatientId] = useState("");
   const [launchId, setLaunchId] = useState("");
   const [fhirServer, setFhirServer] = useState("");
@@ -104,6 +147,7 @@ export default function App() {
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [fhirBaseUrl, setFhirBaseUrl] = useState(() => window.Config.fhirBaseUrl ?? "");
   const [clientId, setClientId] = useState(() => window.Config.clientId ?? "");
+  const [clientSecret, setClientSecret] = useState(() => window.Config.clientSecret ?? "");
   const [redirectUri, setRedirectUri] = useState(() => window.Config.redirectUri ?? "");
   const [flowEntries, setFlowEntries] = useState<FlowEntry[]>(loadFlowLog);
   const initialized = useRef(false);
@@ -191,6 +235,7 @@ export default function App() {
 
       sessionStorage.setItem(SK_TOKEN_ENDPOINT, tokenEndpoint);
       sessionStorage.setItem(SK_CLIENT_ID, clientId);
+      if (clientSecret) sessionStorage.setItem(SK_CLIENT_SECRET, clientSecret);
       sessionStorage.setItem(SK_REDIRECT_URI, redirectUri);
 
       const { codeVerifier, codeChallenge } = await generatePKCE();
@@ -267,7 +312,7 @@ export default function App() {
         codeVerifier,
         savedClientId,
         savedRedirectUri,
-        window.Config.clientSecret
+        sessionStorage.getItem(SK_CLIENT_SECRET) ?? window.Config.clientSecret
       );
 
       const jwtPayload = parseJwtPayload(tokenRes.access_token);
@@ -314,27 +359,78 @@ export default function App() {
 
       window.history.replaceState({}, "", window.location.pathname);
 
-      const { reports: data, bundle, url } = await fetchDiagnosticReports(
-        iss,
-        patient,
-        tokenRes.access_token
-      );
+      // Fetch DiagnosticReports — always attempt regardless of granted scopes
+      try {
+        const drResult = await fetchDiagnosticReports(iss, patient, tokenRes.access_token);
+        addEntry({
+          label: "Fetch DiagnosticReports",
+          timestamp: new Date().toISOString(),
+          request: {
+            method: "GET",
+            url: drResult.url,
+            body: JSON.stringify({ Authorization: "Bearer [access_token]" }, null, 2),
+          },
+          response: {
+            status: drResult.status,
+            body: drResult.ok
+              ? JSON.stringify(drResult.data?.bundle, null, 2)
+              : drResult.rawBody,
+            isError: !drResult.ok,
+          },
+        });
+        if (drResult.ok && drResult.data) {
+          setReports(drResult.data.reports);
+          setDiagnosticReportsAllowed(true);
+        } else {
+          setDiagnosticReportsAllowed(false);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Network error fetching DiagnosticReports";
+        addEntry({
+          label: "Fetch DiagnosticReports",
+          timestamp: new Date().toISOString(),
+          request: { method: "GET", url: "DiagnosticReport endpoint" },
+          response: { body: msg, isError: true },
+        });
+        setDiagnosticReportsAllowed(false);
+      }
 
-      addEntry({
-        label: "Fetch DiagnosticReports",
-        timestamp: new Date().toISOString(),
-        request: {
-          method: "GET",
-          url,
-          body: JSON.stringify({ Authorization: "Bearer [access_token]" }, null, 2),
-        },
-        response: {
-          status: 200,
-          body: JSON.stringify(bundle, null, 2),
-        },
-      });
+      // Fetch Observations — always attempt regardless of granted scopes
+      try {
+        const obsResult = await fetchObservations(iss, patient, tokenRes.access_token);
+        addEntry({
+          label: "Fetch Observations",
+          timestamp: new Date().toISOString(),
+          request: {
+            method: "GET",
+            url: obsResult.url,
+            body: JSON.stringify({ Authorization: "Bearer [access_token]" }, null, 2),
+          },
+          response: {
+            status: obsResult.status,
+            body: obsResult.ok
+              ? JSON.stringify(obsResult.data?.bundle, null, 2)
+              : obsResult.rawBody,
+            isError: !obsResult.ok,
+          },
+        });
+        if (obsResult.ok && obsResult.data) {
+          setObservations(obsResult.data.observations);
+          setObservationsAllowed(true);
+        } else {
+          setObservationsAllowed(false);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Network error fetching Observations";
+        addEntry({
+          label: "Fetch Observations",
+          timestamp: new Date().toISOString(),
+          request: { method: "GET", url: "Observation endpoint" },
+          response: { body: msg, isError: true },
+        });
+        setObservationsAllowed(false);
+      }
 
-      setReports(data);
       setPhase("ready");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Authorization callback failed.";
@@ -378,12 +474,14 @@ export default function App() {
           fhirServer={fhirServer}
           fhirBaseUrl={fhirBaseUrl}
           clientId={clientId}
+          clientSecret={clientSecret}
           redirectUri={redirectUri}
           isDiscovering={isDiscovering}
           error={fetchError}
           onAuthorize={handleAuthorize}
           onFhirBaseUrlChange={setFhirBaseUrl}
           onClientIdChange={setClientId}
+          onClientSecretChange={setClientSecret}
           onRedirectUriChange={setRedirectUri}
         />
       );
@@ -430,15 +528,18 @@ export default function App() {
             </Alert>
           )}
 
-          {!fetchError && reports.length === 0 && (
-            <Alert severity="info">No diagnostic reports found for this patient.</Alert>
-          )}
-
-          {reports.length > 0 && (
-            <>
-              <Typography variant="h6" fontWeight={600} mb={2}>
-                {reports.length} Report{reports.length !== 1 ? "s" : ""} Found
-              </Typography>
+          <Box mb={4}>
+            <Typography variant="h6" fontWeight={600} mb={2}>
+              Diagnostic Reports
+            </Typography>
+            {!diagnosticReportsAllowed ? (
+              <Alert severity="warning">
+                Diagnostic report data is not displayed — insufficient permissions. Grant{" "}
+                <strong>patient/DiagnosticReport.r</strong> scope to view this section.
+              </Alert>
+            ) : reports.length === 0 ? (
+              <Alert severity="info">No diagnostic reports found for this patient.</Alert>
+            ) : (
               <Grid container spacing={2}>
                 {reports.map((report) => (
                   <Grid item xs={12} md={6} lg={4} key={report.id}>
@@ -446,8 +547,30 @@ export default function App() {
                   </Grid>
                 ))}
               </Grid>
-            </>
-          )}
+            )}
+          </Box>
+
+          <Box mt={5}>
+            <Typography variant="h6" fontWeight={600} mb={2}>
+              Observations
+            </Typography>
+            {!observationsAllowed ? (
+              <Alert severity="warning">
+                Observation data is not displayed — insufficient permissions. Grant{" "}
+                <strong>patient/Observation.r</strong> scope to view this section.
+              </Alert>
+            ) : observations.length === 0 ? (
+              <Alert severity="info">No observations found for this patient.</Alert>
+            ) : (
+              <Grid container spacing={2}>
+                {observations.map((obs) => (
+                  <Grid item xs={12} md={6} lg={4} key={obs.id}>
+                    <ObservationCard observation={obs} />
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </Box>
         </Container>
       </Box>
     );

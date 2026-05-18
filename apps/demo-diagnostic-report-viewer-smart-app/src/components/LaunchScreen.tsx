@@ -40,12 +40,14 @@ interface LaunchScreenProps {
   fhirServer: string;
   fhirBaseUrl: string;
   clientId: string;
+  clientSecret: string;
   redirectUri: string;
   isDiscovering: boolean;
   error?: string;
   onAuthorize: () => void;
   onFhirBaseUrlChange: (url: string) => void;
   onClientIdChange: (value: string) => void;
+  onClientSecretChange: (value: string) => void;
   onRedirectUriChange: (value: string) => void;
 }
 
@@ -54,12 +56,14 @@ export default function LaunchScreen({
   fhirServer,
   fhirBaseUrl,
   clientId,
+  clientSecret,
   redirectUri,
   isDiscovering,
   error,
   onAuthorize,
   onFhirBaseUrlChange,
   onClientIdChange,
+  onClientSecretChange,
   onRedirectUriChange,
 }: LaunchScreenProps) {
   return (
@@ -133,9 +137,17 @@ export default function LaunchScreen({
               />
               <TextField
                 fullWidth
-                label="Client ID"
+                label="Consumer Key"
                 value={clientId}
                 onChange={(e) => onClientIdChange(e.target.value)}
+                size="small"
+                inputProps={{ style: { fontFamily: "monospace", fontSize: 13 } }}
+              />
+              <TextField
+                fullWidth
+                label="Consumer Secret"
+                value={clientSecret}
+                onChange={(e) => onClientSecretChange(e.target.value)}
                 size="small"
                 inputProps={{ style: { fontFamily: "monospace", fontSize: 13 } }}
               />
